@@ -4,6 +4,7 @@ function calculateEnergy(deviceData) {
 
   const result = {};
   let totalEnergy = 0;
+  let currentPowerDraw = 0;
 
   for (let id = 0; id <= 12; id++) {
 
@@ -15,6 +16,10 @@ function calculateEnergy(deviceData) {
     const energy = config.power * hours;
 
     totalEnergy += energy;
+    
+    if (raw.status === "ON") {
+      currentPowerDraw += config.power;
+    }
 
     result[id] = {
       name: config.name,
@@ -27,7 +32,8 @@ function calculateEnergy(deviceData) {
 
   return {
     devices: result,
-    total_energy_wh: Number(totalEnergy.toFixed(4))
+    total_energy_wh: Number(totalEnergy.toFixed(4)),
+    current_power_draw_watts: currentPowerDraw
   };
 }
 

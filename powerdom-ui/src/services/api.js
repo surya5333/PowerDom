@@ -41,3 +41,23 @@ export const resetDevices = async () => {
     return false;
   }
 };
+
+export const setMonthlyLimit = async (limit) => {
+  try {
+    await axios.post(`${API_URL}/settings/monthly-limit`, { limit });
+    return true;
+  } catch (error) {
+    console.error('Error setting monthly limit:', error);
+    return false;
+  }
+};
+
+export const getHistory = async () => {
+  try {
+    const response = await axios.get(`${API_URL}/history`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching history:', error);
+    return [];
+  }
+};

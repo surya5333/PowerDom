@@ -4,6 +4,10 @@ const { SerialPort } = require('serialport');
 const { ReadlineParser } = require('@serialport/parser-readline');
 
 const calculateEnergy = require('./calculation');
+const db = require('./db');
+const { getDynamicDailyBudget, getProjectedConsumption } = require('./budget');
+const { performPowerControl } = require('./automation');
+const cron = require('node-cron');
 
 const app = express();
 app.use(cors());
@@ -98,6 +102,24 @@ function stopReconnection() {
 // Initial connection attempt
 connectArduino();
 
+// ROLLOVERS (Midnight)
+cron.schedule('0 0 * * *', async () => {
+  console.log("Starting midnight rollover...");
+  const today = new Date().toISOString().substring(0, 10);
+  const status = calculateEnergy(deviceData);
+  const totalKwh = status.total_energy_wh / 1000;
+
+  // Save daily total
+  db.run("INSERT OR REPLACE INTO daily_energy (date, total_kwh) VALUES (?, ?)", [today, totalKwh], (err) => {
+    if (err) console.error("Error saving daily history:", err.message);
+    else console.log(`Daily history saved for ${today}: ${totalKwh.toFixed(4)} kWh`);
+  });
+  
+  // Reset daily counters on Arduino
+  if (hardwareConnected) arduino.write("RESET\n");
+  deviceData = {};
+});
+
 // ROUTES
 app.post('/on/:id', (req, res) => {
   if (!hardwareConnected) {
@@ -124,23 +146,70 @@ app.post('/reset', (req, res) => {
   res.json({ message: "RESET command sent" });
 });
 
-app.get('/status', (req, res) => {
+// Set Monthly Limit
+app.post('/settings/monthly-limit', (req, res) => {
+  const { limit } = req.body;
+  db.run("UPDATE settings SET value = ? WHERE key = 'monthly_limit_kwh'", [limit], (err) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ message: "Monthly limit updated" });
+  });
+});
+
+// Get History for Graphs
+app.get('/history', (req, res) => {
+  console.log("Fetching daily energy history...");
+  db.all("SELECT * FROM daily_energy ORDER BY date DESC LIMIT 30", (err, rows) => {
+    if (err) {
+      console.error("Database error fetching history:", err.message);
+      return res.status(500).json({ error: err.message });
+    }
+    console.log(`Returning ${rows.length} records.`);
+    res.json(rows);
+  });
+});
+
+app.get('/status', async (req, res) => {
   if (!hardwareConnected) {
-    return res.json({
-      connected: false,
-      devices: {},
-      total_energy_wh: 0
+    const budgetInfo = await getDynamicDailyBudget(0);
+    return res.json({ 
+      connected: false, 
+      devices: {}, 
+      total_energy_wh: 0,
+      ...budgetInfo,
+      projectedKwh: 0,
+      powerSavingLevel: 'SAFE',
+      notifications: []
     });
   }
 
   // Request fresh status from Arduino
   arduino.write("STATUS\n");
 
-  setTimeout(() => {
+  setTimeout(async () => {
     const finalData = calculateEnergy(deviceData);
+    const budgetInfo = await getDynamicDailyBudget(finalData.total_energy_wh);
+    const energySoFarKwh = finalData.total_energy_wh / 1000;
+    
+    // Direct Power Control Automation
+    const notifications = performPowerControl(
+      finalData.devices,
+      energySoFarKwh,
+      budgetInfo.dailyBudgetKwh,
+      (id) => arduino.write(`OFF ${id}\n`)
+    );
+
+    // Calculate allowedPowerKw for frontend display if needed
+    const currentHour = new Date().getHours();
+    const currentMinute = new Date().getMinutes();
+    const remainingHours = Math.max(0.1, 24 - (currentHour + currentMinute / 60));
+    const allowedPowerKw = Math.max(0, (budgetInfo.dailyBudgetKwh - energySoFarKwh) / remainingHours);
+
     res.json({
       connected: true,
-      ...finalData
+      ...finalData,
+      ...budgetInfo,
+      allowedPowerKw,
+      notifications
     });
   }, 400);
 });
