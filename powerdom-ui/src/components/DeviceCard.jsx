@@ -85,6 +85,15 @@ const EnergyValue = styled.div`
 const Priority = styled.div`
   font-size: 12px;
   color: #718096;
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+`;
+
+const SensorContribution = styled.div`
+  font-size: 11px;
+  color: #ff7a45;
+  font-weight: 500;
 `;
 
 const ActionButton = styled.button`
@@ -135,17 +144,27 @@ const DeviceCard = ({ device, onToggle, disabled }) => {
       
       <StatusBadge isOn={isOn}>{device.status}</StatusBadge>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-        <EnergyInfo>
-          <EnergyValue>
-            {device.energy_wh.toFixed(4)}
-            <span>Wh</span>
-          </EnergyValue>
-          <Priority>Priority: {device.priority}</Priority>
-        </EnergyInfo>
-        <TimeActive>
-          {formatTime(device.time_ms)}
-        </TimeActive>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+          <EnergyInfo>
+            <EnergyValue>
+              {device.energy_wh.toFixed(4)}
+              <span>Wh</span>
+            </EnergyValue>
+          </EnergyInfo>
+          <TimeActive>
+            {formatTime(device.time_ms)}
+          </TimeActive>
+        </div>
+        
+        <Priority>
+          <span>Priority: {device.priority}</span>
+          {isOn && device.sensorContribution !== undefined && (
+            <SensorContribution>
+              {device.sensorContribution.toFixed(3)}W
+            </SensorContribution>
+          )}
+        </Priority>
       </div>
 
       <ActionButton 

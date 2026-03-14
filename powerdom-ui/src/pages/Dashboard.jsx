@@ -4,8 +4,8 @@ import { getStatus, turnOn, turnOff, resetDevices, setMonthlyLimit, getHistory }
 import DeviceCard from '../components/DeviceCard';
 import TotalEnergyGauge from '../components/TotalEnergyGauge';
 import Notification from '../components/Notification';
-import { MdChevronRight, MdWarning, MdSettings, MdHistory } from 'react-icons/md';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { MdChevronRight, MdWarning, MdSettings, MdHistory, MdTimeline } from 'react-icons/md';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend } from 'recharts';
 
 const DashboardContainer = styled.div`
   display: flex;
@@ -86,8 +86,9 @@ const ResetButton = styled.button`
 
 const BudgetGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(7, 1fr);
   gap: 20px;
+  @media (max-width: 1400px) { grid-template-columns: repeat(4, 1fr); }
   @media (max-width: 900px) { grid-template-columns: repeat(2, 1fr); }
 `;
 
@@ -147,12 +148,77 @@ const HistorySection = styled.div`
   height: 350px;
 `;
 
+const LiveGraphSection = styled.div`
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  padding: 30px;
+  height: 400px;
+`;
+
 const Dashboard = () => {
   const [data, setData] = useState(null);
   const [history, setHistory] = useState([]);
+  const [liveChartData, setLiveChartData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isConnected, setIsConnected] = useState(true);
   const [notifications, setNotifications] = useState([]);
+
+  // SSE for real-time power updates
+  useEffect(() => {
+    console.log("Connecting to SSE /live...");
+    const eventSource = new EventSource("http://localhost:5000/live");
+
+    eventSource.onopen = () => {
+      console.log("SSE Connection opened");
+    };
+
+    eventSource.onmessage = (event) => {
+      try {
+        const liveData = JSON.parse(event.data);
+        console.log("SSE Message received:", liveData);
+        
+        // Update main data state for numerical cards
+      setData(prev => prev ? { 
+        ...prev, 
+        realPower: liveData.realPower, 
+        realCurrent: liveData.realCurrent,
+        estimatedPower: liveData.estimatedPower,
+        normalizedPower: liveData.normalizedPower,
+        distributedPower: liveData.distributedPower, // Add this
+        realEnergyWh: liveData.realEnergyWh,
+        estimatedEnergyWh: liveData.estimatedEnergyWh,
+        current_power_draw_watts: liveData.estimatedPower
+      } : null);
+
+        setLiveChartData(prev => {
+          const newData = [
+            ...prev,
+            {
+              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+              real: liveData.realPower || 0,
+              estimated: liveData.estimatedPower || 0,
+              normalized: liveData.normalizedPower || 0
+            }
+          ];
+          // Keep last 30 points
+          return newData.slice(-30);
+        });
+      } catch (err) {
+        console.error("Error parsing SSE data:", err);
+      }
+    };
+
+    eventSource.onerror = (err) => {
+      console.error("SSE Error:", err);
+      eventSource.close();
+    };
+
+    return () => {
+      console.log("Closing SSE connection");
+      eventSource.close();
+    };
+  }, []);
 
   const fetchData = async () => {
     const result = await getStatus();
@@ -229,7 +295,11 @@ const Dashboard = () => {
 
   if (loading && !data) return <div style={{ color: 'white', padding: '40px' }}>Loading PowerDom Phase 2...</div>;
 
-  const devicesList = Object.keys(data?.devices || {}).map((key) => ({ id: key, ...data.devices[key] }));
+  const devicesList = Object.keys(data?.devices || {}).map((key) => ({ 
+    id: key, 
+    ...data.devices[key],
+    sensorContribution: data.distributedPower ? data.distributedPower[key] : undefined
+  }));
 
   const getAlertBanner = () => {
     if (!isConnected) {
@@ -314,6 +384,24 @@ const Dashboard = () => {
             {data?.allowedPowerKw?.toFixed(3)}<span>kW</span>
           </BudgetValue>
         </BudgetCard>
+        <BudgetCard>
+          <BudgetLabel>Measured Power</BudgetLabel>
+          <BudgetValue color="#ff4d4f">
+            {data?.realPower?.toFixed(2) || '0.00'}<span>W</span>
+          </BudgetValue>
+        </BudgetCard>
+        <BudgetCard>
+          <BudgetLabel>Normalized (Appliance)</BudgetLabel>
+          <BudgetValue color="#ff7a45">
+            {data?.normalizedPower?.toFixed(1) || '0.0'}<span>W</span>
+          </BudgetValue>
+        </BudgetCard>
+        <BudgetCard>
+          <BudgetLabel>Real vs Est Energy</BudgetLabel>
+          <BudgetValue color="#805ad5" style={{ fontSize: '14px' }}>
+            {data?.realEnergyWh?.toFixed(2)} / {data?.estimatedEnergyWh?.toFixed(2)}<span>Wh</span>
+          </BudgetValue>
+        </BudgetCard>
       </BudgetGrid>
 
       <MainCard>
@@ -332,6 +420,52 @@ const Dashboard = () => {
           </DeviceGrid>
         </ContentLayout>
       </MainCard>
+
+      <LiveGraphSection>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+          <MdTimeline size={20} color="#a0aec0" />
+          <h2 style={{ fontSize: '18px', fontWeight: 500 }}>Real-Time Power Comparison (Real vs. Estimated)</h2>
+        </div>
+        <ResponsiveContainer width="100%" height="80%">
+          <LineChart data={liveChartData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+            <XAxis dataKey="time" stroke="#718096" fontSize={10} tick={{ fill: '#718096' }} />
+            <YAxis stroke="#718096" fontSize={12} unit="W" />
+            <Tooltip 
+              contentStyle={{ backgroundColor: '#1a2a44', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
+              itemStyle={{ fontSize: '12px' }}
+            />
+            <Legend verticalAlign="top" height={36} />
+            <Line 
+              type="monotone" 
+              dataKey="real" 
+              stroke="#ff4d4f" 
+              strokeWidth={2}
+              name="Measured Power (Raw)" 
+              dot={false}
+              isAnimationActive={false}
+            />
+            <Line 
+              type="monotone" 
+              dataKey="normalized" 
+              stroke="#ff7a45" 
+              strokeWidth={2}
+              name="Normalized Power (Scaled)" 
+              dot={false}
+              isAnimationActive={false}
+            />
+            <Line 
+              type="monotone" 
+              dataKey="estimated" 
+              stroke="#1890ff" 
+              strokeWidth={2}
+              name="Estimated Power (Model)" 
+              dot={false}
+              isAnimationActive={false}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </LiveGraphSection>
 
       <HistorySection>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
