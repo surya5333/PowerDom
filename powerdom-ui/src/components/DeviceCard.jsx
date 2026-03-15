@@ -34,7 +34,7 @@ const Name = styled.h3`
 const Switch = styled.div`
   width: 32px;
   height: 16px;
-  background: ${({ isOn, theme }) => (isOn ? theme.colors.accentTeal : '#4a5568')};
+  background: ${({ $isOn, theme }) => ($isOn ? theme.colors.accentTeal : '#4a5568')};
   border-radius: 10px;
   position: relative;
   cursor: pointer;
@@ -48,7 +48,7 @@ const Switch = styled.div`
     background: #ffffff;
     border-radius: 50%;
     top: 2px;
-    left: ${({ isOn }) => (isOn ? '18px' : '2px')};
+    left: ${({ $isOn }) => ($isOn ? '18px' : '2px')};
     transition: left 0.2s;
   }
 `;
@@ -59,9 +59,9 @@ const StatusBadge = styled.div`
   font-size: 10px;
   font-weight: bold;
   width: fit-content;
-  background: ${({ isOn, theme }) => (isOn ? 'rgba(79, 209, 197, 0.15)' : 'rgba(45, 55, 72, 0.5)')};
-  color: ${({ isOn, theme }) => (isOn ? theme.colors.accentTeal : '#a0aec0')};
-  border: 1px solid ${({ isOn, theme }) => (isOn ? 'rgba(79, 209, 197, 0.2)' : 'transparent')};
+  background: ${({ $isOn, theme }) => ($isOn ? 'rgba(79, 209, 197, 0.15)' : 'rgba(45, 55, 72, 0.5)')};
+  color: ${({ $isOn, theme }) => ($isOn ? theme.colors.accentTeal : '#a0aec0')};
+  border: 1px solid ${({ $isOn, theme }) => ($isOn ? 'rgba(79, 209, 197, 0.2)' : 'transparent')};
 `;
 
 const EnergyInfo = styled.div`
@@ -103,14 +103,14 @@ const ActionButton = styled.button`
   font-size: 13px;
   font-weight: 600;
   margin-top: 4px;
-  background: ${({ isOn, theme }) => (isOn ? 'rgba(79, 209, 197, 0.15)' : 'rgba(49, 130, 206, 0.15)')};
-  color: ${({ isOn, theme }) => (isOn ? theme.colors.accentTeal : theme.colors.accentBlue)};
-  border: 1px solid ${({ isOn, theme }) => (isOn ? 'rgba(79, 209, 197, 0.3)' : 'rgba(49, 130, 206, 0.3)')};
+  background: ${({ $isOn, theme }) => ($isOn ? 'rgba(79, 209, 197, 0.15)' : 'rgba(49, 130, 206, 0.15)')};
+  color: ${({ $isOn, theme }) => ($isOn ? theme.colors.accentTeal : theme.colors.accentBlue)};
+  border: 1px solid ${({ $isOn, theme }) => ($isOn ? 'rgba(79, 209, 197, 0.3)' : 'rgba(49, 130, 206, 0.3)')};
 
   &:hover {
-    background: ${({ isOn, theme, disabled }) => {
+    background: ${({ $isOn, theme, disabled }) => {
       if (disabled) return 'transparent';
-      return isOn ? 'rgba(79, 209, 197, 0.25)' : 'rgba(49, 130, 206, 0.25)';
+      return $isOn ? 'rgba(79, 209, 197, 0.25)' : 'rgba(49, 130, 206, 0.25)';
     }};
   }
 `;
@@ -139,10 +139,10 @@ const DeviceCard = ({ device, onToggle, disabled }) => {
     <Card disabled={disabled}>
       <CardHeader>
         <Name>{device.name}</Name>
-        <Switch isOn={isOn} onClick={() => !disabled && onToggle(device.id, device.status)} />
+        <Switch $isOn={isOn} onClick={() => !disabled && onToggle(device.id, device.status)} />
       </CardHeader>
       
-      <StatusBadge isOn={isOn}>{device.status}</StatusBadge>
+      <StatusBadge $isOn={isOn}>{device.status}</StatusBadge>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
@@ -168,7 +168,7 @@ const DeviceCard = ({ device, onToggle, disabled }) => {
       </div>
 
       <ActionButton 
-        isOn={isOn} 
+        $isOn={isOn} 
         disabled={disabled}
         onClick={() => !disabled && onToggle(device.id, device.status)}
       >

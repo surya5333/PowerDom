@@ -44,9 +44,9 @@ const DeviceEnergy = styled.span`
 `;
 
 const ToggleButton = styled.button`
-  background-color: ${({ isOn, theme }) => (isOn ? theme.colors.accentTeal : theme.colors.cardBg)};
-  color: ${({ isOn, theme }) => (isOn ? theme.colors.background : theme.colors.textSecondary)};
-  border: 1px solid ${({ isOn, theme }) => (isOn ? theme.colors.accentTeal : theme.colors.border)};
+  background-color: ${({ $isOn, theme }) => ($isOn ? theme.colors.accentTeal : theme.colors.cardBg)};
+  color: ${({ $isOn, theme }) => ($isOn ? theme.colors.background : theme.colors.textSecondary)};
+  border: 1px solid ${({ $isOn, theme }) => ($isOn ? theme.colors.accentTeal : theme.colors.border)};
   padding: 5px 10px;
   border-radius: 4px;
   font-size: 12px;
@@ -63,8 +63,8 @@ const ToggleButton = styled.button`
 const PriorityBar = styled.div`
   width: 4px;
   height: 30px;
-  background-color: ${({ priority, theme }) => {
-    switch(priority) {
+  background-color: ${({ $priority, theme }) => {
+    switch($priority) {
       case 1: return theme.colors.danger; // High priority
       case 2: return theme.colors.accentPurple;
       case 3: return theme.colors.accentCyan;
@@ -83,14 +83,14 @@ const ActiveDevicesPanel = ({ devices, onToggle }) => {
         {devices.map((device) => (
           <DeviceItem key={device.id}>
             <div style={{ display: 'flex', alignItems: 'center' }}>
-              <PriorityBar priority={device.priority} />
+              <PriorityBar $priority={device.priority} />
               <DeviceInfo>
                 <DeviceName>{device.name}</DeviceName>
                 <DeviceEnergy>{device.energy_wh.toFixed(2)} Wh</DeviceEnergy>
               </DeviceInfo>
             </div>
             <ToggleButton 
-              isOn={device.status === 'ON'}
+              $isOn={device.status === 'ON'}
               onClick={() => onToggle(device.id, device.status)}
             >
               <FaPowerOff />

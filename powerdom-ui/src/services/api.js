@@ -61,3 +61,65 @@ export const getHistory = async () => {
     return [];
   }
 };
+
+// --- Analytics APIs ---
+
+export const getPowerHistory = async () => {
+  try {
+    const response = await axios.get(`${API_URL}/analytics/power-history`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching power history:', error);
+    return [];
+  }
+};
+
+export const getPeakPower = async () => {
+  try {
+    const response = await axios.get(`${API_URL}/analytics/peak-power`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching peak power:', error);
+    return { peakPower: 0, timestamp: Date.now() };
+  }
+};
+
+export const getDailyEnergyCurve = async () => {
+  try {
+    const response = await axios.get(`${API_URL}/analytics/daily-energy`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching daily energy curve:', error);
+    return [];
+  }
+};
+
+export const getIdlePower = async () => {
+  try {
+    const response = await axios.get(`${API_URL}/analytics/idle-power`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching idle power:', error);
+    return { idlePower: 0 };
+  }
+};
+
+export const getAnalyticsEvents = async () => {
+  try {
+    const response = await axios.get(`${API_URL}/analytics/events`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching analytics events:', error);
+    return [];
+  }
+};
+
+export const getAnalyticsHistory = async () => {
+  try {
+    const response = await axios.get(`${API_URL}/analytics/history`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching analytics history:', error);
+    return [];
+  }
+};

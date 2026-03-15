@@ -1,0 +1,102 @@
+openapi: 3.0.0
+info:
+  title: PowerDom Energy Reports API
+  description: API for generating and downloading comprehensive energy reports in Excel format.
+  version: 1.0.0
+servers:
+  - url: http://localhost:5000/api/reports
+    description: Local development server
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+security:
+  - bearerAuth: []
+paths:
+  /energy-summary:
+    get:
+      summary: Download Energy Summary Report
+      description: Generates a multi-sheet Excel report containing daily energy consumption, budgets, and peak power.
+      parameters:
+        - name: start_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: "2026-03-01"
+        - name: end_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: "2026-03-15"
+        - name: timezone
+          in: query
+          required: false
+          schema:
+            type: string
+            default: "UTC"
+          example: "America/New_York"
+      responses:
+        '200':
+          description: Successful report generation
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '204':
+          description: No data found for the given range
+        '401':
+          description: Unauthorized
+        '422':
+          description: Validation error (e.g., range > 366 days)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /device-usage:
+    get:
+      summary: Download Device Usage Report
+      description: Generates an Excel report showing energy consumption per device.
+      parameters:
+        - name: start_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: timezone
+          in: query
+          required: false
+          schema:
+            type: string
+            default: "UTC"
+      responses:
+        '200':
+          description: Successful report generation
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '204':
+          description: No data found
+        '422':
+          description: Validation error

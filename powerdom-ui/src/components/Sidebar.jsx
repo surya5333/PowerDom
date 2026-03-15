@@ -1,6 +1,7 @@
 import React from 'react';
 import styled from 'styled-components';
-import { MdDashboard } from 'react-icons/md';
+import { NavLink } from 'react-router-dom';
+import { MdDashboard, MdAnalytics } from 'react-icons/md';
 
 const SidebarContainer = styled.div`
   width: 240px;
@@ -31,30 +32,43 @@ const MenuList = styled.div`
   gap: 10px;
 `;
 
-const MenuItem = styled.div`
+const MenuItem = styled(NavLink)`
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
   border-radius: 8px;
-  color: #ffffff;
+  color: #a0aec0;
   cursor: pointer;
-  background: ${({ active }) => (active ? 'linear-gradient(90deg, #3182ce 0%, rgba(49, 130, 206, 0.2) 100%)' : 'transparent')};
-  border-left: ${({ active }) => (active ? '4px solid #4fd1c5' : '4px solid transparent')};
+  text-decoration: none;
   transition: all 0.3s ease;
+  border-left: 4px solid transparent;
 
   svg {
     font-size: 20px;
-    color: ${({ active }) => (active ? '#ffffff' : '#a0aec0')};
+    color: inherit;
   }
 
   span {
     font-size: 14px;
-    font-weight: ${({ active }) => (active ? '600' : '400')};
+    font-weight: 400;
   }
 
   &:hover {
     background: rgba(255, 255, 255, 0.05);
+    color: #ffffff;
+  }
+
+  &.active {
+    background: linear-gradient(90deg, rgba(79, 209, 197, 0.1) 0%, rgba(79, 209, 197, 0.02) 100%);
+    border-left: 4px solid #4fd1c5;
+    color: #ffffff;
+    span {
+      font-weight: 600;
+    }
+    svg {
+      color: #4fd1c5;
+    }
   }
 `;
 
@@ -65,9 +79,13 @@ const Sidebar = () => {
         Power<span>Dom</span>
       </Logo>
       <MenuList>
-        <MenuItem active>
+        <MenuItem to="/" end>
           <MdDashboard />
           <span>Dashboard</span>
+        </MenuItem>
+        <MenuItem to="/analytics">
+          <MdAnalytics />
+          <span>Analytics</span>
         </MenuItem>
       </MenuList>
     </SidebarContainer>

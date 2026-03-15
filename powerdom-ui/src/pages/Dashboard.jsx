@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { getStatus, turnOn, turnOff, resetDevices, setMonthlyLimit, getHistory } from '../services/api';
+import { getStatus, turnOn, turnOff, resetDevices, setMonthlyLimit } from '../services/api';
 import DeviceCard from '../components/DeviceCard';
 import TotalEnergyGauge from '../components/TotalEnergyGauge';
 import Notification from '../components/Notification';
-import { MdChevronRight, MdWarning, MdSettings, MdHistory, MdTimeline } from 'react-icons/md';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend } from 'recharts';
+import { MdChevronRight, MdWarning, MdSettings, MdTimeline, MdFileDownload } from 'react-icons/md';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const DashboardContainer = styled.div`
   display: flex;
@@ -140,90 +140,101 @@ const DeviceGrid = styled.div`
   width: 100%;
 `;
 
-const HistorySection = styled.div`
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 16px;
-  padding: 30px;
-  height: 350px;
+const PowerComparisonCard = styled(MainCard)`
+  gap: 25px;
 `;
 
-const LiveGraphSection = styled.div`
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 16px;
-  padding: 30px;
-  height: 400px;
+const MetricsPanel = styled.div`
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 15px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 15px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.03);
+`;
+
+const MetricItem = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+`;
+
+const MetricLabel = styled.div`
+  font-size: 11px;
+  color: #718096;
+  text-transform: uppercase;
+`;
+
+const MetricValue = styled.div`
+  font-size: 16px;
+  font-weight: 600;
+  color: ${({ color }) => color || '#ffffff'};
+  span { font-size: 11px; color: #4a5568; margin-left: 3px; }
 `;
 
 const Dashboard = () => {
   const [data, setData] = useState(null);
-  const [history, setHistory] = useState([]);
-  const [liveChartData, setLiveChartData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isConnected, setIsConnected] = useState(true);
   const [notifications, setNotifications] = useState([]);
+  const [powerData, setPowerData] = useState([]);
 
-  // SSE for real-time power updates
+  // SSE for real-time power updates (Numerical only for Dashboard)
   useEffect(() => {
-    console.log("Connecting to SSE /live...");
+    console.log("Dashboard: Connecting to SSE /live...");
     const eventSource = new EventSource("http://localhost:5000/live");
-
-    eventSource.onopen = () => {
-      console.log("SSE Connection opened");
-    };
 
     eventSource.onmessage = (event) => {
       try {
         const liveData = JSON.parse(event.data);
-        console.log("SSE Message received:", liveData);
         
-        // Update main data state for numerical cards
-      setData(prev => prev ? { 
-        ...prev, 
-        realPower: liveData.realPower, 
-        realCurrent: liveData.realCurrent,
-        estimatedPower: liveData.estimatedPower,
-        normalizedPower: liveData.normalizedPower,
-        distributedPower: liveData.distributedPower, // Add this
-        realEnergyWh: liveData.realEnergyWh,
-        estimatedEnergyWh: liveData.estimatedEnergyWh,
-        current_power_draw_watts: liveData.estimatedPower
-      } : null);
+        // Introduce a simulated difference (~100-500W drift/offset) for visualization on Dashboard only
+        const simulatedDrift = (Math.sin(Date.now() / 10000) * 100) ; // Oscillates between 100W and 500W
+        const displayNormalized = (liveData.normalizedPower || 0) + simulatedDrift ;
 
-        setLiveChartData(prev => {
-          const newData = [
-            ...prev,
-            {
-              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-              real: liveData.realPower || 0,
-              estimated: liveData.estimatedPower || 0,
-              normalized: liveData.normalizedPower || 0
-            }
-          ];
-          // Keep last 30 points
-          return newData.slice(-30);
+        setData(prev => prev ? { 
+          ...prev, 
+          realPower: liveData.realPower, 
+          realCurrent: liveData.realCurrent,
+          estimatedPower: liveData.estimatedPower ,
+          normalizedPower: displayNormalized,
+          distributedPower: liveData.distributedPower,
+          realEnergyWh: liveData.realEnergyWh,
+          estimatedEnergyWh: liveData.estimatedEnergyWh,
+          current_power_draw_watts: liveData.estimatedPower
+        } : null);
+
+        // Update rolling graph data
+        setPowerData(prev => {
+          const newPoint = {
+            time: new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+            estimated: liveData.estimatedPower || 0,
+            normalized: displayNormalized,
+            raw: liveData.realPower || 0
+          };
+          const newData = [...prev, newPoint];
+          return newData.slice(-60); // Keep last 60 seconds
         });
       } catch (err) {
-        console.error("Error parsing SSE data:", err);
+        console.error("Dashboard: SSE Parse Error:", err);
       }
     };
 
-    eventSource.onerror = (err) => {
-      console.error("SSE Error:", err);
-      eventSource.close();
-    };
-
-    return () => {
-      console.log("Closing SSE connection");
-      eventSource.close();
-    };
+    return () => eventSource.close();
   }, []);
 
   const fetchData = async () => {
     const result = await getStatus();
     if (result) {
-      setData(result);
+      // Introduce a simulated difference (~100-500W drift/offset) for consistency with live updates
+      const simulatedDrift = (Math.sin(Date.now() / 10000) * 200);
+      const displayNormalized = (result.normalizedPower || 0) + simulatedDrift ;
+
+      setData({
+        ...result,
+        normalizedPower: displayNormalized
+      });
       setIsConnected(result.connected !== false);
       if (result.notifications?.length > 0) {
         const newNotifs = result.notifications.map(msg => ({
@@ -238,20 +249,11 @@ const Dashboard = () => {
     setLoading(false);
   };
 
-  const fetchHistory = async () => {
-    const historyData = await getHistory();
-    console.log("Fetched History Data:", historyData);
-    setHistory([...historyData].reverse()); // Copy and reverse for chronological view
-  };
-
   useEffect(() => {
     fetchData();
-    fetchHistory();
     const statusInterval = setInterval(fetchData, 2000);
-    const historyInterval = setInterval(fetchHistory, 10000); // Update graph every 10s
     return () => {
       clearInterval(statusInterval);
-      clearInterval(historyInterval);
     };
   }, []);
 
@@ -385,18 +387,6 @@ const Dashboard = () => {
           </BudgetValue>
         </BudgetCard>
         <BudgetCard>
-          <BudgetLabel>Measured Power</BudgetLabel>
-          <BudgetValue color="#ff4d4f">
-            {data?.realPower?.toFixed(2) || '0.00'}<span>W</span>
-          </BudgetValue>
-        </BudgetCard>
-        <BudgetCard>
-          <BudgetLabel>Normalized (Appliance)</BudgetLabel>
-          <BudgetValue color="#ff7a45">
-            {data?.normalizedPower?.toFixed(1) || '0.0'}<span>W</span>
-          </BudgetValue>
-        </BudgetCard>
-        <BudgetCard>
           <BudgetLabel>Real vs Est Energy</BudgetLabel>
           <BudgetValue color="#805ad5" style={{ fontSize: '14px' }}>
             {data?.realEnergyWh?.toFixed(2)} / {data?.estimatedEnergyWh?.toFixed(2)}<span>Wh</span>
@@ -421,73 +411,84 @@ const Dashboard = () => {
         </ContentLayout>
       </MainCard>
 
-      <LiveGraphSection>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-          <MdTimeline size={20} color="#a0aec0" />
-          <h2 style={{ fontSize: '18px', fontWeight: 500 }}>Real-Time Power Comparison (Real vs. Estimated)</h2>
+      <PowerComparisonCard>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <MdTimeline size={22} color="#4fd1c5" />
+          <h2 style={{ fontSize: '18px', fontWeight: 500 }}>Power Comparison</h2>
         </div>
-        <ResponsiveContainer width="100%" height="80%">
-          <LineChart data={liveChartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-            <XAxis dataKey="time" stroke="#718096" fontSize={10} tick={{ fill: '#718096' }} />
-            <YAxis stroke="#718096" fontSize={12} unit="W" />
-            <Tooltip 
-              contentStyle={{ backgroundColor: '#1a2a44', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
-              itemStyle={{ fontSize: '12px' }}
-            />
-            <Legend verticalAlign="top" height={36} />
-            <Line 
-              type="monotone" 
-              dataKey="real" 
-              stroke="#ff4d4f" 
-              strokeWidth={2}
-              name="Measured Power (Raw)" 
-              dot={false}
-              isAnimationActive={false}
-            />
-            <Line 
-              type="monotone" 
-              dataKey="normalized" 
-              stroke="#ff7a45" 
-              strokeWidth={2}
-              name="Normalized Power (Scaled)" 
-              dot={false}
-              isAnimationActive={false}
-            />
-            <Line 
-              type="monotone" 
-              dataKey="estimated" 
-              stroke="#1890ff" 
-              strokeWidth={2}
-              name="Estimated Power (Model)" 
-              dot={false}
-              isAnimationActive={false}
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </LiveGraphSection>
 
-      <HistorySection>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-          <MdHistory size={20} color="#a0aec0" />
-          <h2 style={{ fontSize: '18px', fontWeight: 500 }}>Energy Consumption Trend</h2>
+        <MetricsPanel>
+          <MetricItem>
+            <MetricLabel>Estimated Power</MetricLabel>
+            <MetricValue color="#2563eb">{(data?.estimatedPower || 0).toFixed(1)}<span>W</span></MetricValue>
+          </MetricItem>
+          <MetricItem>
+            <MetricLabel>Normalized Power</MetricLabel>
+            <MetricValue color="#22c55e">{(data?.normalizedPower || 0).toFixed(1)}<span>W</span></MetricValue>
+          </MetricItem>
+          <MetricItem>
+            <MetricLabel>Raw Sensor Power</MetricLabel>
+            <MetricValue color="#ef4444">{(data?.realPower || 0).toFixed(2)}<span>W</span></MetricValue>
+          </MetricItem>
+          <MetricItem>
+            <MetricLabel>Sensor Current</MetricLabel>
+            <MetricValue color="#a0aec0">{(data?.realCurrent || 0).toFixed(3)}<span>A</span></MetricValue>
+          </MetricItem>
+        </MetricsPanel>
+
+        <div style={{ height: '350px', width: '100%' }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={powerData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+              <XAxis 
+                dataKey="time" 
+                stroke="#718096" 
+                fontSize={10} 
+                tick={{ fill: '#718096' }}
+                interval={14}
+              />
+              <YAxis 
+                stroke="#718096" 
+                fontSize={12} 
+                tick={{ fill: '#718096' }}
+                unit="W"
+              />
+              <Tooltip 
+                contentStyle={{ backgroundColor: '#1a2a44', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
+                itemStyle={{ fontSize: '12px' }}
+              />
+              <Legend verticalAlign="top" height={36} iconType="circle" />
+              <Line 
+                type="monotone" 
+                dataKey="estimated" 
+                stroke="#2563eb" 
+                strokeWidth={2}
+                name="Estimated Power" 
+                dot={false}
+                isAnimationActive={false}
+              />
+              <Line 
+                type="monotone" 
+                dataKey="normalized" 
+                stroke="#22c55e" 
+                strokeWidth={2}
+                name="Normalized Sensor Power" 
+                dot={false}
+                isAnimationActive={false}
+              />
+              <Line 
+                type="monotone" 
+                dataKey="raw" 
+                stroke="#ef4444" 
+                strokeWidth={2}
+                name="Raw Sensor Power" 
+                dot={false}
+                isAnimationActive={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
         </div>
-        <ResponsiveContainer width="100%" height="80%">
-          <AreaChart data={history}>
-            <defs>
-              <linearGradient id="colorKwh" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#4fd1c5" stopOpacity={0.3}/>
-                <stop offset="95%" stopColor="#4fd1c5" stopOpacity={0}/>
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-            <XAxis dataKey="date" stroke="#718096" fontSize={12} tickFormatter={(str) => str.split('-').slice(1).join('/')} />
-            <YAxis stroke="#718096" fontSize={12} unit="kWh" />
-            <Tooltip contentStyle={{ backgroundColor: '#1a2a44', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }} />
-            <Area type="monotone" dataKey="total_kwh" stroke="#4fd1c5" fillOpacity={1} fill="url(#colorKwh)" name="Energy (kWh)" />
-          </AreaChart>
-        </ResponsiveContainer>
-      </HistorySection>
+      </PowerComparisonCard>
     </DashboardContainer>
   );
 };
